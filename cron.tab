@@ -1,0 +1,5 @@
+# Once a day, create a new batch of tweets
+* 0 * * * cd markov_chain_twitter_bot/ && ./tweet_generater_top.py -sa -g -n 75 > ../cron_generated.log
+
+# Every minute, attempt to send a tweet (rolls the dice to decide if it actually will)
+* * * * * cd markov_chain_twitter_bot/ && ./tweeter.py > ../cron_tweeted.log
