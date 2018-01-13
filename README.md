@@ -47,7 +47,7 @@ If you want to delay sending the tweets generated via `tweet_generator_top.py`, 
 
 This bot was originally designed to pull tweets from a Twitter account, however, it can also process comma-separated text in a text file, or scrape content from the web.
 
-#### Static (Comma-Separated) Text
+#### Static Text (Comma-Separated)
 To use a local text file, set `STATIC_TEST = True` and specify the name of a text file containing comma-separated "tweets" as `TEST_SOURCE`.
 
 #### Static Text (One line, multiple sentences)
