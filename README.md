@@ -4,16 +4,15 @@ This is forked from tommeagher's [heroku_ebooks](https://github.com/tommeagher/h
 
 Main differences, in no particular order:
 
-1. Replaced use of twitter module with tweepy. 
-   tweepy has this concept of Cursors that abstracts away the need to
+1. Replaced use of `twitter` module with `tweepy`. 
+   `tweepy` has this concept of Cursors that abstracts away the need to
    come up with multiple queries when you want more data than the Twitter API
-   allows for a single call. Plus, if you hit your 15-minute limit, it will
-   simply wait until the window has expired and continue the query.
+   allows for a single call. Plus, if you hit your 15-minute (or whatever) limit, it will simply wait until the window has expired and continue the query.
 2. Added support for scraping RSS feeds.
-3. Added support for ingesting text files (aside from the test file provided).
-4. Replaced the home-grown markov chain code with markovify.
-   Given markovify is pretty widely used, I figured I'd leverage it here. Less code to manage, and they also have this nice support for handling multiple markov models and letting you give weights to which one to use when making a sentence, checks to make sure sentences don't overlap too much with the original text, and support for controlling the length of the sentences.
-5. Add a sample crontab file to show I'm running this locally. No heroku stuff for me.
+3. Added (more) support for ingesting text files (aside from the test file provided).
+4. Replaced the home-grown markov chain code with `markovify`.
+   Given `markovify` is more widely used, I figured I'd leverage it here. There's less code to manage (since it's a module) this way. `markovify` also have this nice support for handling multiple markov models. It lets you give weights to which one to use when making a sentence. Also, it checks to make sure sentences don't overlap too much with the original text, and there's support for controlling the length of the sentence you want to create.
+5. Added a sample crontab file to show I'm running this locally. No heroku stuff for me.
    As a sort of side-effect, I regressed back to Python 2.7 and adjusted the syntax accordingly. 
 
 The rest of this README was modifed to reflect the latest changes.
@@ -26,28 +25,33 @@ The rest of this README was modifed to reflect the latest changes.
 4. Make a copy of the `local_settings_example.py` file and name it `local_settings.py`
 5. Take the consumer key (and secret) and access token (and secret) from your Twiter application and paste them into the appropriate spots in `local_settings.py`.
 6. In `local_settings.py`, be sure to add the handle of the Twitter user you want your _ebooks account to be based on. To make your tweets go live, change the `DEBUG` variable to `False`.
+7. Specify whatever sources you want aggregated in `local_settings.py`
+8. If you're using crontab, modify `cron.tab` as you see fit and load it or add it to your existing crontab. Else run `tweet_generator_top.py` by hand and enjoy.
 
 ## Configuring
 
 There are several parameters that control the behavior of the bot. You can adjust them by setting them in your `local_settings.py` file.
 
-As you've no doubt gathered from the file list, there are a few scripts here. The naming/organization could be improved upon.
+As you've no doubt gathered from the file list, there are a few scripts here. The naming/organization could be improved upon. Below is some information on each of them.
 
 ### markov_chain_generator.py
-Responsbile for aggregating all of the data and generating the list of tweets. This also defines functions that others can use for setting up an API connection and sending tweets.
+Responsbile for aggregating all of the data and generating the list of tweets (via `markovify`). You could say this does most of the heavy lifting. This also defines functions that other scripts can use for setting up an API connection and sending tweets.
 
 ### tweet_generator_top.py
-A sort of top-level script that leverages markov_chain_generator.py. When you want to generate content, you run this. The idea behind this is you generate/review the tweets to send out, and then they are pickled. If you don't trust your bot to reliably come up with dank material, you can run the script in 'interactive mode' where you say whether a given tweet meets your high standards and is worthy of actually being sent out. You can choose to tweet it immediately, or save it to be sent later.
+A sort of top-level script that leverages `markov_chain_generator.py`. When you want to generate content, you run this. The idea behind this is you generate/review the tweets to send out, and then they are pickled. If you don't trust your bot to reliably come up with dank material, you can run the script in 'interactive mode' where you say whether a given tweet meets your high standards and is worthy of actually being sent out. You can choose to tweet it immediately, or save it to be sent later (via `tweeter.py`).
 
 ### tweeter.py
-If you want to delay sending the tweets generated via tweet_generator_top, but have it done automatically you can use this. This checks for whatever tweets you have saved and, upon invocation, will decide whether it's time to send out a tweet. The common use case is to call this in a cronjob every so often, resulting in tweets being sent in a psuedorandom time. Run with -h to see available options, including setting the probability for sending a tweet on a given invocation.
+If you want to delay sending the tweets generated via `tweet_generator_top.py`, but have it done automatically, you can use this. This script checks for whatever tweets you have saved and, upon invocation, will decide whether it's time to send out a tweet. The common use case is to call this in a cronjob every so often, resulting in tweets being sent in a psuedorandom time. Run with -h to see available options, including setting the probability for sending a tweet on a given invocation.
 
 ### Additional sources
 
 This bot was originally designed to pull tweets from a Twitter account, however, it can also process comma-separated text in a text file, or scrape content from the web.
 
-#### Static Text
+#### Static (Comma-Separated) Text
 To use a local text file, set `STATIC_TEST = True` and specify the name of a text file containing comma-separated "tweets" as `TEST_SOURCE`.
+
+#### Static Text (One line, multiple sentences)
+To use text files that contain multiple sentences (e.g. news articles, books, whatever), simply specify the names of the files in `FILES`. The file will be searched for with respect to the directory the script is being executed.
 
 #### Web Content
 To scrape content from the web, set `SCRAPE_URL` to `True`. This bot makes use of the [`find_all()` method](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#find-all) of Python's BeautfulSoup library. The implementation of this method requires the definition of three inputs in `local_settings.py`.
@@ -73,3 +77,8 @@ DEBUG = True
 
 ## Credit
 The baseline of this code should got to tommeagher's [heroku_ebooks](https://github.com/tommeagher/heroku_ebooks), which also credits other users/contributors.
+
+## TODO
+1. All the print statements should really be replaced with a proper logger.
+2. The breakdown of work between the files (or at least their names) should probably be changed for better clarity.
+3. I like the idea of having multiple markov models, but controlling when one is used, especially in a more sequential manner (vs. random). It would be nice to have control to, say, have the first half a sentence generated from model A, and the second half of a sentence from model B. Just general support for controlling when to use a given model.
