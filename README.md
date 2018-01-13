@@ -4,7 +4,7 @@ This is forked from tommeagher's [heroku_ebooks](https://github.com/tommeagher/h
 
 Main differences, in no particular order:
 
-1. Replaced use of twitter module with tweepy
+1. Replaced use of twitter module with tweepy. 
    tweepy has this concept of Cursors that abstracts away the need to
    come up with multiple queries when you want more data than the Twitter API
    allows for a single call. Plus, if you hit your 15-minute limit, it will
