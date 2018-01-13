@@ -1,8 +1,22 @@
-# markov_chain_twitter_port
+# markov_chain_twitter_bot
 
-This is a basic Python port of [@harrisj's](https://twitter.com/harrisj) [iron_ebooks](https://github.com/harrisj/iron_ebooks/) Ruby script. Using Heroku's scheduler, you can post to an _ebooks Twitter account based on the corpus of an existing Twitter at pseudorandom intervals. Currently, it is the magic behind [@adriennelaf_ebx](http://www.twitter.com/adriennelaf_ebx) and [@stevebuttry_ebx](http://www.twitter.com/stevebuttry_ebx), among many, many others in the wild.
+This is forked from tommeagher's [heroku_ebooks](https://github.com/tommeagher/heroku_ebooks) Python script. I simply took it as a baseline and refactored/played with it to suit my needs. Maybe someone else will find it useful.
 
-This project should work in the latest releases of Python 2.7 and Python 3. By default, in Heroku, this will be deployed to Python 3.
+Main differences, in no particular order:
+
+1. Replaced use of twitter module with tweepy
+   tweepy has this concept of Cursors that abstracts away the need to
+   come up with multiple queries when you want more data than the Twitter API
+   allows for a single call. Plus, if you hit your 15-minute limit, it will
+   simply wait until the window has expired and continue the query.
+2. Added support for scraping RSS feeds.
+3. Added support for ingesting text files (aside from the test file provided).
+4. Replaced the home-grown markov chain code with markovify.
+   Given markovify is pretty widely used, I figured I'd leverage it here. Less code to manage, and they also have this nice support for handling multiple markov models and letting you give weights to which one to use when making a sentence, checks to make sure sentences don't overlap too much with the original text, and support for controlling the length of the sentences.
+5. Add a sample crontab file to show I'm running this locally. No heroku stuff for me.
+   As a sort of side-effect, I regressed back to Python 2.7 and adjusted the syntax accordingly. 
+
+The rest of this README was modifed to reflect the latest changes.
 
 ## Setup
 
@@ -12,35 +26,21 @@ This project should work in the latest releases of Python 2.7 and Python 3. By d
 4. Make a copy of the `local_settings_example.py` file and name it `local_settings.py`
 5. Take the consumer key (and secret) and access token (and secret) from your Twiter application and paste them into the appropriate spots in `local_settings.py`.
 6. In `local_settings.py`, be sure to add the handle of the Twitter user you want your _ebooks account to be based on. To make your tweets go live, change the `DEBUG` variable to `False`.
-7. Create an account at Heroku, if you don't already have one. [Install the Heroku toolbelt](https://devcenter.heroku.com/articles/quickstart#step-2-install-the-heroku-toolbelt) and set your Heroku login on the command line.
-8. Type the command `heroku create` to generate the _ebooks Python app on the platform that you can schedule.
-9. The only Python requirement for this script is [python-twitter](https://github.com/bear/python-twitter), the `pip install` of which is handled by Heroku automatically.
-9. `git commit -am 'updated the local_settings.py'`
-10. `git push heroku master`
-11. Test your upload by typing `heroku run worker`. You should either get a response that says "3, no, sorry, not this time" or a message with the body of your post. If you get the latter, check your _ebooks Twitter account to see if it worked.
-12. Now it's time to configure the scheduler. `heroku addons:create scheduler:standard`
-13. Once that runs, type `heroku addons:open scheduler`. This will open up a browser window where you can adjust the time interval for the script to run. The scheduled command should be `python ebooks.py`. I recommend setting it at one hour.
-14. Sit back and enjoy the fruits of your labor.
-
 
 ## Configuring
 
 There are several parameters that control the behavior of the bot. You can adjust them by setting them in your `local_settings.py` file.
 
-```
-ODDS = 8
-```
+As you've no doubt gathered from the file list, there are a few scripts here. The naming/organization could be improved upon.
 
-The bot does not run on every invocation. It runs in a pseudorandom fashion. At the beginning of each time the script fires, `guess = random.choice(range(ODDS))`. If `guess == 0`, then it proceeds. If your `ODDS = 8`, it should run one out of every 8 times, more or less. You can override it to make it more or less frequent. To make it run every time, you can set it to 0.
+### markov_chain_generator.py
+Responsbile for aggregating all of the data and generating the list of tweets. This also defines functions that others can use for setting up an API connection and sending tweets.
 
+### tweet_generator_top.py
+A sort of top-level script that leverages markov_chain_generator.py. When you want to generate content, you run this. The idea behind this is you generate/review the tweets to send out, and then they are pickled. If you don't trust your bot to reliably come up with dank material, you can run the script in 'interactive mode' where you say whether a given tweet meets your high standards and is worthy of actually being sent out. You can choose to tweet it immediately, or save it to be sent later.
 
-By default, the bot ignores any tweets with URLs in them because those might just be headlines for articles and not text you've written.
-
-```
-ORDER = 2
-```
-
-The ORDER variable represents the Markov index, which is a measure of associativity in the generated Markov chains. 2 is generally more incoherent and 3 or 4 is more lucid. I tend to stick with 2.
+### tweeter.py
+If you want to delay sending the tweets generated via tweet_generator_top, but have it done automatically you can use this. This checks for whatever tweets you have saved and, upon invocation, will decide whether it's time to send out a tweet. The common use case is to call this in a cronjob every so often, resulting in tweets being sent in a psuedorandom time. Run with -h to see available options, including setting the probability for sending a tweet on a given invocation.
 
 ### Additional sources
 
@@ -58,6 +58,9 @@ To scrape content from the web, set `SCRAPE_URL` to `True`. This bot makes use o
 
 __Note:__ Web scraping is experimental and may give you unexpected results. Make sure to test the bot in debugging mode before publishing.
 
+#### RSS Content
+To scrape RSS sites, set `SCRAPE_RSS` to true. The bot leverages the feedparser module and is hard-coded to look for headlines/descriptions (e.g. from news sites), though with a small amount of work could be made paramaterizable.
+
 ## Debugging
 
 If you want to test the script or to debug the tweet generation, you can skip the random number generation and not publish the resulting tweets to Twitter.
@@ -68,12 +71,5 @@ First, adjust the `DEBUG` variable in `local_settings.py`.
 DEBUG = True
 ```
 
-After that, commit the change and `git push heroku master`. Then run the command `heroku run worker` on the command line and watch what happens.
-
-If you want to avoid hitting the Twitter API and instead want to use a static text file, you can do that. First, create a text file containing a Python list of quote-wrapped tweets. Then set the `STATIC_TEST` variable to `True`. Finally, specify the name of text file using the `TEST_SOURCE` variable in `local_settings.py`
-
-
 ## Credit
-As I said, this is based almost entirely on [@harrisj's](https://twitter.com/harrisj) [iron_ebooks](https://github.com/harrisj/iron_ebooks/). He created it in Ruby, and I wanted to port it to Python. All the credit goes to him. As a result, all of the blame for clunky implementation in Python fall on me.
-
-Many thanks to the [many folks who have contributed](CONTRIBUTORS.md) to the development of this project since it was open sourced in 2013. If you see ways to improve the code, please fork it and send a [pull request](https://github.com/tommeagher/heroku_ebooks/pulls), or [file an issue](https://github.com/tommeagher/heroku_ebooks/issues) for me, and I'll address it.
+The baseline of this code should got to tommeagher's [heroku_ebooks](https://github.com/tommeagher/heroku_ebooks), which also credits other users/contributors.
