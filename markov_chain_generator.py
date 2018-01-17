@@ -75,10 +75,10 @@ def filter_text(text):
     text = re.sub(r'((h\/t)|(http))\S+', '', text)  
 
     # Replace references to other accounts    
-    text = re.sub(r'the \.\@\w+', random.choice(REPLACE_WORDS), text)
-    text = re.sub(r'the \@\w+', random.choice(REPLACE_WORDS), text)
-    text = re.sub(r'\.\@\w+', random.choice(REPLACE_WORDS), text)  
-    text = re.sub(r'\@\w+', random.choice(REPLACE_WORDS), text)
+    text = re.sub(r'the \.\@\w+', '', text)
+    text = re.sub(r'the \@\w+', '', text)
+    text = re.sub(r'\.\@\w+', '', text)  
+    text = re.sub(r'\@\w+', '', text)
     
     # collaspse consecutive whitespace to single spaces.    
     text = re.sub(r'\s+', ' ', text)
@@ -351,12 +351,64 @@ def aggregate_data(api, save_aggregated_data, save_fname='aggregated_data.p'):
         pickle.dump(aggregated_data, open(save_fname, "wb"))
 
     return aggregated_data
+
+def make_sentence(file_models, aggregated_data_models, text_models):
+    '''Come up with a sentence based on the different Markov models provided.
+
+    Currently, file_models is a list of Markov models generated from provided files with different orders.
+    aggregated_data_models is a separate list of models generated from everything else (again, using differen orders)
+    text_model is a combination of the above two models (for their respective orders).
+
+    TODO: Generalize this function.'''
+
+    # First pick a random model
+    if random.randint(0,1):
+        # Choose models of the same order
+        index = random.randint(0, len(file_models)-1)
+        file_model = file_models[index]
+        aggregated_data_model = aggregated_data_models[index]
+        text_model = text_models[index]
+    else:
+        file_model = random.choice(file_models)
+        aggregated_data_model = random.choice(aggregated_data_models)
+        text_model = random.choice(text_models)
+        
+    if MODEL_MODE == 'seq':
+        # Create two sentences, one from each model and mush them together
+        file_model_sentence = None
+        aggregated_data_model_sentence = None
+        while file_model_sentence is None:
+            # Randomly choose between the file model and the hybrid model
+            # TODO: This is specific to the bot I'm using, but not everyone may want this.
+            # Need to find a way to generalize this too.
+            file_model_sentence = random.choice([file_model.make_short_sentence(80),
+                                                 text_model.make_short_sentence(80)])
+        while aggregated_data_model_sentence is None:
+            aggregated_data_model_sentence = aggregated_data_model.make_short_sentence(80)
+        
+        # Randomize the order of the sentences we concatenate 
+        if random.randint(0,1) == 1:
+            tweet = file_model_sentence + ' ' + aggregated_data_model_sentence
+        else:
+            tweet = aggregated_data_model_sentence + ' ' + file_model_sentence 
+    elif MODEL_MODE == 'hybrid':
+        # Use the hybrid model
+        tweet = text_model.make_short_sentence(160)
+        pass
+    else:
+        LOGGER.error('Unknown MODEL_MODE provided: %s' % MODEL_MODE)
+        
+    # For sufficiently short tweets, add another sentence to it from the hybrid model
+    if not tweet or len(tweet) < 60:
+        tweet += '.' +  text_model.make_short_sentence(160)
+
+    return tweet
     
 def generate_tweets(num, api, save_aggregated_data=False, load_aggregated_data=False):
     '''Main function that comes up with all the data to be used by the Markov model 
     and generates that Markov chains to be tweeted.'''
     
-    order = ORDER
+    orders = ORDERS
     tweets = []
     file_text = []
     
@@ -373,10 +425,10 @@ def generate_tweets(num, api, save_aggregated_data=False, load_aggregated_data=F
     # We assume text files have a huge amount of data.
     # To avoid it dorwning out the other sets of data, put it in a separate model
     # and simply give both models equal weight.
-    file_model = markovify.Text(file_text, state_size=order)
-    aggregated_data_model = markovify.Text(aggregated_data, state_size=order)
+    file_models = [markovify.Text(file_text, state_size=order) for order in orders]
+    aggregated_data_models = [markovify.Text(aggregated_data, state_size=order) for order in orders]
 
-    text_model = markovify.combine([ file_model, aggregated_data_model ], [ 1, 4 ])
+    text_models = [markovify.combine([file_model, aggregated_data_model], [ 1, 4 ]) for file_model, aggregated_data_model in zip(file_models, aggregated_data_models)]
 
     ##########################################################################
     # Now to create the actual sentences
@@ -384,30 +436,8 @@ def generate_tweets(num, api, save_aggregated_data=False, load_aggregated_data=F
         if len(tweets) % 10 == 0:
             LOGGER.info('Current count: %d' % len(tweets))
 
-        # Sometimes just go about making a sentence
-        if random.randint(0, 1) == 1:        
-            tweet = text_model.make_short_sentence(160)
-        else:
-            # If other tweet is empty, restart the whole process
-            # Do this indefinitely -- we assume we can't get stuck in an inifite loop
-            while True:
-                # Other times, make two smaller sentences to join together
-                tweet = text_model.make_short_sentence(80)
-                if not tweet:
-                    continue
-                
-                other_tweet = text_model.make_short_sentence(80)
-
-                if not other_tweet:
-                    continue
-                
-                tweet += "." + other_tweet
-                break
-
-        # For sufficiently short tweets, add another sentence to it
-        if len(tweet) < 60:
-            tweet += '.' + text_model.make_short_sentence(160)
-            
+        tweet = make_sentence(file_models, aggregated_data_models, text_models)
+        
         if tweet:
             tweet = filter_text(tweet)
             tweet = strip_duplicate_words(tweet)            
@@ -415,6 +445,8 @@ def generate_tweets(num, api, save_aggregated_data=False, load_aggregated_data=F
             # We don't want empty tweets
             continue
 
+        tweet = tweet.lower()
+        
         # Randomly convert everything to upper case
         if random.randint(0, 10) == 1:
             tweet = tweet.upper()
@@ -429,12 +461,15 @@ def send_tweet(api, tweet):
     LOGGER.info('Tweet sent: %s' % status.text.encode('utf-8'))
 
 def get_logger(name):
+    '''Create a logger with the provided name. Set up some default behavior/formatting.'''
     logging.basicConfig(
         format='[%(levelname)s] [%(asctime)s] %(filename)s:%(lineno)s: %(message)s',
         datefmt='%H:%M:%S')
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    logger.info('TEST')
+    if DEBUG:
+        logger.setLevel(logging.DEBUG)        
+    else:
+        logger.setLevel(logging.INFO)
     return logger
 
 LOGGER = get_logger(os.path.basename(__file__))

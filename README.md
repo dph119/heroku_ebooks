@@ -53,7 +53,7 @@ To use a local text file, set `STATIC_TEST = True` and specify the name of a tex
 #### Static Text (One line, multiple sentences)
 To use text files that contain multiple sentences (e.g. news articles, books, whatever), simply specify the names of the files in `FILES`. The file will be searched for with respect to the directory the script is being executed.
 
-#### Web Content
+#### Web Content (non-RSS)
 To scrape content from the web, set `SCRAPE_URL` to `True`. This bot makes use of the [`find_all()` method](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#find-all) of Python's BeautfulSoup library. The implementation of this method requires the definition of three inputs in `local_settings.py`.
 
 1. A list of URLs to scrape as `SRC_URL`.
@@ -67,16 +67,14 @@ To scrape RSS sites, set `SCRAPE_RSS` to true. The bot leverages the feedparser 
 
 ## Debugging
 
-If you want to test the script or to debug the tweet generation, you can skip the random number generation and not publish the resulting tweets to Twitter.
-
-First, adjust the `DEBUG` variable in `local_settings.py`.
+If you want to enable greater verbosity, adjust the `DEBUG` variable in `local_settings.py`.
 
 ```
 DEBUG = True
 ```
 
 ## Credit
-The baseline of this code should got to tommeagher's [heroku_ebooks](https://github.com/tommeagher/heroku_ebooks), which also credits other users/contributors.
+The baseline of this code should go to tommeagher's [heroku_ebooks](https://github.com/tommeagher/heroku_ebooks), which also credits other users/contributors.
 
 ## TODO
 1. The breakdown of work between the files (or at least their names) should probably be changed for better clarity.

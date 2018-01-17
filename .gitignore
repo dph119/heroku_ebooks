@@ -6,3 +6,4 @@
 .git
 /.idea
 __pycache__
+local_settings.py

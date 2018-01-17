@@ -46,14 +46,14 @@ if __name__ == "__main__":
     elif args.g:
         tweets = generate_tweets(args.n, api, args.sa, args.la)
     else:
-        assert 0, 'Not loading any tweets to process?'
+        LOGGER.error('Not loading any tweets to process?')
         
     # Start processing the tweets
     quit_processing = False
     queued_tweets = []
     if args.i:
         for index, tweet in enumerate(tweets):        
-            LOGGER.info('tweet')
+            LOGGER.info('\n%s' % tweet)
             valid_input = False
             while not valid_input:
                 valid_input = True
@@ -91,11 +91,10 @@ if __name__ == "__main__":
         except:
             LOGGER.info("Couldn't open accepted_tweets.p. Starting a new file.")
             pickle.dump(queued_tweets, open( 'accepted_tweets.p', "wb" ))
-            exit(0)
-
-        # If we got to this point, then we have a list to append to
-        saved_tweets = saved_tweets + queued_tweets
-        pickle.dump(saved_tweets, open( 'accepted_tweets.p', "wb" ))
+        else:
+            # If we got to this point, then we have a list to append to
+            saved_tweets = saved_tweets + queued_tweets
+            pickle.dump(saved_tweets, open( 'accepted_tweets.p', "wb" ))
         
             
 
