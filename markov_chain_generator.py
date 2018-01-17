@@ -6,6 +6,8 @@ import tweepy
 import feedparser
 import markovify
 import pickle
+import logging
+import os
 from random import shuffle
 from unicodedata import normalize
 from bs4 import BeautifulSoup
@@ -124,22 +126,22 @@ def scrape_page(src_url, web_context, web_attributes):
     for i in range(len(src_url)):
         if src_url[i] != last_url:
             last_url = src_url[i]
-            print ">>> Scraping {0}".format(src_url[i])
+            LOGGER.info("Scraping {0}".format(src_url[i]))
             try:
                 req = urllib2.Request(src_url[i], headers=hdr)
                 page = urlopen(req)                
             except Exception:
                 last_url = "ERROR"
                 import traceback
-                print ">>> Error scraping {0}:".format(src_url[i])
-                print traceback.format_exc()
+                LOGGER.debug("Error scraping {0}:".format(src_url[i]))
+                LOGGER.debug(traceback.format_exc())
                 continue
             soup = BeautifulSoup(page, 'html.parser')
 
         hits = soup.find_all(web_context[i], attrs=web_attributes[i])
 
         if not hits:
-            print ">>> No results found!"
+            LOGGER.info("No results found!")
             continue
         else:
             errors = 0
@@ -148,14 +150,14 @@ def scrape_page(src_url, web_context, web_attributes):
                     tweet = str(hit).strip()                    
                     tweet = tweet.replace('\n', '')
                 except (UnicodeEncodeError, UnicodeDecodeError):
-                    print hit.text
+                    LOGGER.debug(hit.text)
                     errors += 1
                     continue
                 if tweet:
                     tweets.append(tweet)
             if errors > 0:
-                print ">>> We had trouble reading {} result{} out of {}.".format(
-                    errors, "s" if errors > 1 else "", len(hits))
+                LOGGER.warning("We had trouble reading {} result{} out of {}.".format(
+                    errors, "s" if errors > 1 else "", len(hits)))
 
     return tweets
 
@@ -167,14 +169,14 @@ def scrape_rss(src_rss):
     for i in range(len(src_rss)):
         if src_rss[i] != last_rss:
             last_rss = src_rss[i]
-            print ">>> Scraping {0}".format(src_rss[i])
+            LOGGER.info("Scraping {0}".format(src_rss[i]))
             try:
                 d = feedparser.parse(src_rss[i])
             except Exception:
                 last_rss = "ERROR"
                 import traceback
-                print ">>> Error scraping RSS {0}:".format(src_rss[i])
-                print traceback.format_exc()
+                LOGGER.warning("Error scraping RSS {0}:".format(src_rss[i]))
+                LOGGER.warning(traceback.format_exc())
                 continue
 
         hits = []
@@ -185,7 +187,7 @@ def scrape_rss(src_rss):
             hits += [re.sub('<[^<]+?>', '', entry.summary[:entry.summary.find('<')])]
 
         if not hits:
-            print ">>> No results found!"
+            LOGGER.info("No results found!")
             continue
         else:
             errors = 0
@@ -195,7 +197,7 @@ def scrape_rss(src_rss):
                     tweet = str(tweet).strip()
                     tweet = tweet.replace('\n', '')
                 except (UnicodeEncodeError, UnicodeDecodeError):
-                    print hit
+                    LOGGER.error(hit)
                     errors += 1
                     raise
                     continue
@@ -203,8 +205,8 @@ def scrape_rss(src_rss):
                     tweet = tweet.replace('...', '')
                     tweets.append(tweet)
             if errors > 0:
-                print ">>> We had trouble reading {} result{} out of {}.".format(
-                    errors, "s" if errors > 1 else "", len(hits))
+                LOGGER.warning("We had trouble reading {} result{} out of {}.".format(
+                    errors, "s" if errors > 1 else "", len(hits)))
 
     return tweets
 
@@ -217,7 +219,7 @@ def grab_tweets(api, user):
     user_tweets = api.user_timeline(screen_name=user, count=200)
     
     if len(user_tweets) == 0:
-        print "No tweets found for user:", user
+        LOGGER.warning("No tweets found for user: %s" % user)
     else:
         for tweet in user_tweets:
             tweet.text = filter_tweet(tweet)
@@ -245,7 +247,7 @@ def get_twitter_search_tweets(api, search_terms, search_terms_limits):
             if tweet.text:
                 tweets.append(tweet.text)
 
-        print "{0} tweets found with term '{1}'".format(count, search_term)
+        LOGGER.info("{0} tweets found with term '{1}'".format(count, search_term))
         
     return tweets 
 
@@ -257,9 +259,9 @@ def get_twitter_user_tweets(api, users):
     for handle in users:
         tweets_iter = grab_tweets(api, handle)
         tweets += tweets_iter
-        print "{0} tweets found in {1}".format(len(tweets_iter), handle)
+        LOGGER.info("{0} tweets found in {1}".format(len(tweets_iter), handle))
         if not tweets:
-            print "Error fetching tweets from Twitter. Aborting."
+            LOGGER.error("Error fetching tweets from Twitter. Aborting.")
             exit()
             
     return tweets
@@ -268,7 +270,7 @@ def get_twitter_user_tweets(api, users):
 def load_aggregated_data_file(fname):
     '''Load up previously aggregated/saved data.'''
     
-    print '<<< Loading from', fname
+    LOGGER.info('Loading from %s' % fname)
     # Load up the previously aggregated data
     consolidated_tweets = pickle.load(open(fname, "rb"))
     return consolidated_tweets
@@ -278,7 +280,7 @@ def load_test_data(fname):
     '''Load up some pre-created test file of data. Intended for debugging.'''
     
     tweets = []
-    print ">>> Generating from {0}".format(fname)
+    LOGGER.info("Generating from {0}".format(fname))
     string_list = open(fna,e).readlines()
     for item in string_list:
         tweets += item.split(",")
@@ -293,7 +295,7 @@ def load_files(fnames, read_amounts):
     # Files tend to dominate the pool, so to avoid that,
     # simply cut out part of it
     for index, fname in enumerate(fnames):
-        print '>>>Loading file', fname
+        LOGGER.info('Loading file %s' % fname)
         text = ' '.join(open(fname).readlines())
         text = text[:int(len(text)*read_amounts[index])]
 
@@ -319,33 +321,33 @@ def aggregate_data(api, save_aggregated_data, save_fname='aggregated_data.p'):
     if STATIC_TEST:
         # Loading test data takes precedence over everything else
         source_tweets += load_test_data(TEST_SOURCE)
-        print 'Total source_tweets:', len(source_tweets)        
+        LOGGER.info('Total source_tweets: %d ' % len(source_tweets))
     else:
         if SCRAPE_URL:
             source_tweets += scrape_page(SRC_URL, WEB_CONTEXT, WEB_ATTRIBUTES)
-        
-        print 'Total source_tweets:', len(source_tweets)
+
+        LOGGER.info('Total source_tweets: %d ' % len(source_tweets)) 
     
         if SCRAPE_RSS:
             source_tweets += scrape_rss(SRC_RSS)
 
-        print 'Total source_tweets:', len(source_tweets)                        
+        LOGGER.info('Total source_tweets: %d ' % len(source_tweets))
     
         if SEARCH_TERMS:
             source_tweets += get_twitter_search_tweets(api, SEARCH_TERMS, SEARCH_TERMS_LIMITS)
-            
-        print 'Total source_tweets:', len(source_tweets)                                    
+
+        LOGGER.info('Total source_tweets: %d ' % len(source_tweets))
 
         if SOURCE_ACCOUNTS and len(SOURCE_ACCOUNTS[0]) > 0:
             source_tweets += get_twitter_user_tweets(api, SOURCE_ACCOUNTS)
-        
-        print 'Total source_tweets:', len(source_tweets)
+
+        LOGGER.info('Total source_tweets: %d ' % len(source_tweets))
     
     # Throw it all into one giant text blob
     aggregated_data = ' '.join(source_tweets)
     
     if save_aggregated_data:
-        print '>>> Saving to', save_fname
+        LOGGER.info('Saving to %s ' % save_fname)
         pickle.dump(aggregated_data, open(save_fname, "wb"))
 
     return aggregated_data
@@ -380,7 +382,7 @@ def generate_tweets(num, api, save_aggregated_data=False, load_aggregated_data=F
     # Now to create the actual sentences
     while len(tweets) < num:
         if len(tweets) % 10 == 0:
-            print 'Current count:', len(tweets)
+            LOGGER.info('Current count: %d' % len(tweets))
 
         # Sometimes just go about making a sentence
         if random.randint(0, 1) == 1:        
@@ -424,7 +426,18 @@ def generate_tweets(num, api, save_aggregated_data=False, load_aggregated_data=F
 def send_tweet(api, tweet):
     '''Send out a tweet -- simple as that.'''
     status = api.update_status(tweet)
-    print '>>>Tweet sent:', status.text.encode('utf-8')
+    LOGGER.info('Tweet sent: %s' % status.text.encode('utf-8'))
+
+def get_logger(name):
+    logging.basicConfig(
+        format='[%(levelname)s] [%(asctime)s] %(filename)s:%(lineno)s: %(message)s',
+        datefmt='%H:%M:%S')
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.info('TEST')
+    return logger
+
+LOGGER = get_logger(os.path.basename(__file__))
 
 if __name__ == "__main__":
     api = connect()        

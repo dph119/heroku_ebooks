@@ -13,7 +13,10 @@
 import sys
 import pickle
 import argparse
+import logging
 from markov_chain_generator import *
+
+LOGGER = get_logger(os.path.basename(__file__))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='''Utility script for generating/pushing tweets.''')
@@ -50,7 +53,7 @@ if __name__ == "__main__":
     queued_tweets = []
     if args.i:
         for index, tweet in enumerate(tweets):        
-            print tweet
+            LOGGER.info('tweet')
             valid_input = False
             while not valid_input:
                 valid_input = True
@@ -58,7 +61,7 @@ if __name__ == "__main__":
             
                 if val == 'y':
                     send_tweet(api, tweet)
-                    print '>>>SENT!'
+                    LOGGER.info('SENT!')
                 elif val == 'n':
                     pass
                 elif val == 'q':
@@ -69,7 +72,7 @@ if __name__ == "__main__":
                     queued_tweets += [tweet]
                 else:
                     valid_input = False
-                    print 'Invalid input. Try again.'
+                    LOGGER.warning('Invalid input. Try again.')
 
             if quit_processing:
                 break                
@@ -77,16 +80,16 @@ if __name__ == "__main__":
         queued_tweets = tweets
         
     if args.s:
-        print '>>> Saving to tweets.p'
+        LOGGER.info('Saving to tweets.p')
         pickle.dump(tweets[index:], open( "tweets.p", "wb" ))
 
     if len(queued_tweets):
-        print '>>> Saving to accepted_tweets.p'
+        LOGGER.info('Saving to accepted_tweets.p')
         # Append to existing list of queued tweets (or make a new one if it doesn't exist)
         try:
             saved_tweets = pickle.load( open( 'accepted_tweets.p', "rb" ) )
         except:
-            print "Couldn't open accepted_tweets.p. Starting a new file."
+            LOGGER.info("Couldn't open accepted_tweets.p. Starting a new file.")
             pickle.dump(queued_tweets, open( 'accepted_tweets.p', "wb" ))
             exit(0)
 

@@ -79,6 +79,5 @@ DEBUG = True
 The baseline of this code should got to tommeagher's [heroku_ebooks](https://github.com/tommeagher/heroku_ebooks), which also credits other users/contributors.
 
 ## TODO
-1. All the print statements should really be replaced with a proper logger.
-2. The breakdown of work between the files (or at least their names) should probably be changed for better clarity.
-3. I like the idea of having multiple markov models, but controlling when one is used, especially in a more sequential manner (vs. random). It would be nice to have control to, say, have the first half a sentence generated from model A, and the second half of a sentence from model B. Just general support for controlling when to use a given model.
+1. The breakdown of work between the files (or at least their names) should probably be changed for better clarity.
+2. I like the idea of having multiple markov models, but controlling when one is used, especially in a more sequential manner (vs. random). It would be nice to have control to, say, have the first half a sentence generated from model A, and the second half of a sentence from model B. Just general support for controlling when to use a given model.

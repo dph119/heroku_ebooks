@@ -11,7 +11,10 @@
 import random
 import pickle
 import argparse
+import logging
 from markov_chain_generator import *
+
+LOGGER = get_logger(os.path.basename(__file__))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='''Utility script for randomly sending a curated tweet.''')
@@ -33,18 +36,21 @@ if __name__ == "__main__":
         try:
             tweets = pickle.load( open( args.l, "rb" ) )
         except:
-            print 'Filename:', args.l
+            LOGGER.info('Filename:', args.l)
             raise
         if len(tweets) == 0:
-            print 'Warning: No available tweets were found!'
+            LOGGER.warning('Warning: No available tweets were found!')
             # TODO: Add support to send an email 
             exit(1)
         else:
             tweet = tweets[0]
-            send_tweet(api, tweet)
+            try:
+                send_tweet(api, tweet)
+            except:
+                pass
             pickle.dump(tweets[1:], open( args.l, "wb" ))
     else:
-        print '>>>Not doing anything this time...'
+        LOGGER.info('Not doing anything this time...')
 
     
     
